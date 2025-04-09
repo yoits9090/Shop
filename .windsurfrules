@@ -1,0 +1,8 @@
+This directory is a Roblox game project, using roblox-ts, Rojo and robloxlsp
+
+/out shouldnt be touched, its outputed compiled luau code, transpiled with roblox-ts and typescript
+/src is where the code is located, its typescript code
+.client.ts is clientsided code, and is located in starterplayerscripts
+.server.ts is serversided code, and is located in serverscriptservice
+.shared.ts is shared code, and is located in replicatedstorage
+
