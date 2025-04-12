@@ -8,7 +8,7 @@ print("[OnFire] PlayerGui found");
 const gamepassShop = playerGui.WaitForChild("GamepassShop") as ScreenGui;
 print("[OnFire] GamepassShop ScreenGui found");
 
-const gamepassesFrame = gamepassShop.WaitForChild("GamepassesFrame") as Frame;
+// const gamepassesFrame = gamepassShop.WaitForChild("GamepassesFrame") as Frame;
 print("[OnFire] GamepassesFrame found");
 
 const bindableEvent = gamepassShop.WaitForChild("Tweenservice") as BindableEvent;

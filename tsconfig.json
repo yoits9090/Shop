@@ -1,29 +1,32 @@
 {
 	"compilerOptions": {
-		// required
 		"allowSyntheticDefaultImports": true,
-		"downlevelIteration": true,
-		"jsx": "react",
-		"jsxFactory": "React.createElement",
-		"jsxFragmentFactory": "React.Fragment",
-		"module": "commonjs",
-		"moduleResolution": "Node",
-		"noLib": true,
-		"resolveJsonModule": true,
+		"declaration": true,
+		"emitDecoratorMetadata": true,
+		"esModuleInterop": true,
 		"experimentalDecorators": true,
-		"forceConsistentCasingInFileNames": true,
-		"moduleDetection": "force",
-		"strict": true,
-		"target": "ESNext",
-		"typeRoots": ["node_modules/@rbxts", "node_modules/@types", "node_modules/@flamework"],
-
-		// configurable
-		"rootDir": "src",
-		"outDir": "out",
-		"baseUrl": "src",
 		"incremental": true,
-		"tsBuildInfoFile": "out/tsconfig.tsbuildinfo"
+		"jsx": "react",
+		"jsxFactory": "Roact.createElement",
+		"module": "CommonJS",
+		"moduleResolution": "Node",
+		"noImplicitAny": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"noUnusedLocals": true,
+		"outDir": "out",
+		"rootDir": "src",
+		"sourceMap": true,
+		"strict": true,
+		"strictNullChecks": true,
+		"target": "ESNext",
+		"typeRoots": ["node_modules/@rbxts", "node_modules/@flamework"],
+		"noLib": true,
+		"moduleDetection": "force"
 	},
+	"include": [
+		"src/**/*"
+	],
 	"exclude": [
 		"node_modules",
 		"out",
