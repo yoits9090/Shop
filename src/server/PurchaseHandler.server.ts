@@ -8,7 +8,8 @@ const log = (level: "Info" | "Warn" | "Error" | "Debug", message: string) => {
 
 // Define the AbilitiesService interface for type safety
 interface AbilitiesService {
-	applyBenefitByName(benefitName: string, player: Player): void;
+	applyBenefitByName?(benefitName: string, player: Player): void;
+	[key: string]: ((player: Player) => void) | ((benefitName: string, player: Player) => void) | undefined;
 }
 
 // Define the ReceiptInfo interface based on Roblox documentation
@@ -34,14 +35,36 @@ export class PurchaseProcessingService {
 
 	onInit(): void {
 		log("Info", "PurchaseProcessingService initializing...");
+		print("[DEBUG-PURCHASE] PurchaseProcessingService.onInit() called");
+		
 		// Now it's safe to get the dependency
-		this.abilitiesService = Dependency<AbilitiesService>();
-		log("Info", "AbilitiesService dependency resolved");
+		try {
+			print("[DEBUG-PURCHASE] Attempting to resolve AbilitiesService dependency");
+			this.abilitiesService = Dependency<AbilitiesService>();
+			log("Info", "AbilitiesService dependency resolved");
+			print("[DEBUG-PURCHASE] Successfully resolved AbilitiesService dependency");
+			print(`[DEBUG-PURCHASE] AbilitiesService type: ${typeOf(this.abilitiesService)}`);
+		} catch (err) {
+			print(`[DEBUG-PURCHASE] Error resolving dependency: ${err}`);
+		}
 
 		// Check for existing gamepass ownership when a player joins
+		print("[DEBUG] Setting up PlayerAdded event handler");
 		Players.PlayerAdded.Connect((player) => {
+			print(`[DEBUG] Player added: ${player.Name}, checking gamepass ownership`);
 			this.checkExistingGamepassOwnership(player);
 		});
+		
+		// Check if there are already players in the game
+		const existingPlayers = Players.GetPlayers();
+		print(`[DEBUG-PURCHASE] Checking existing players: ${existingPlayers.size()}`);
+		if (existingPlayers.size() > 0) {
+			print(`[DEBUG] Found ${existingPlayers.size()} existing players, checking their gamepass ownership`);
+			for (let i = 0; i < existingPlayers.size(); i++) {
+				const player = existingPlayers[i];
+				this.checkExistingGamepassOwnership(player);
+			}
+		}
 
 		// Set up event listeners for gamepass and developer product purchases
 		MarketplaceService.PromptGamePassPurchaseFinished.Connect(
@@ -96,19 +119,44 @@ export class PurchaseProcessingService {
 		const benefitFunctionName = gamepassBenefitMap.get(gamepassId);
 
 		if (benefitFunctionName !== undefined) {
-			log("Info", `Applying benefit for gamepass ${gamepassId} to ${player.Name}`);
-			log("Debug", `Checking abilitiesService: ${this.abilitiesService}`);
-			log("Debug", `Checking if applyBenefitByName is available`);
+			log(
+				"Info",
+				`Attempting to apply benefit [${benefitFunctionName}] for gamepass ${gamepassId} to ${player.Name}`,
+			);
 			// Use pcall to safely call the method
 			const [success, errorMsg] = pcall(() => {
 				if (this.abilitiesService) {
-					this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+					// Prefer using applyBenefitByName if it exists
+					if ("applyBenefitByName" in this.abilitiesService && this.abilitiesService.applyBenefitByName) {
+						log("Debug", `Using applyBenefitByName for ${benefitFunctionName}`);
+						this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+					} else {
+						// Fallback: Call the specific method directly
+						log("Debug", `Fallback: Directly calling ${benefitFunctionName} on AbilitiesService`);
+						if (
+							benefitFunctionName in this.abilitiesService &&
+							typeIs(this.abilitiesService[benefitFunctionName as keyof AbilitiesService], "function")
+						) {
+							// Try direct method call - in Luau this must compile to a colon call (obj:method)
+							// We can't do this with dynamic property access in TypeScript directly
+							// So we need to use applyBenefitByName which handles this for us
+							if (this.abilitiesService && this.abilitiesService.applyBenefitByName) {
+								this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+							}
+						} else {
+							log(
+								"Error",
+								`Fallback: Benefit function ${benefitFunctionName} not found or not callable on AbilitiesService`,
+							);
+						}
+					}
 				} else {
 					log("Error", "AbilitiesService is not initialized");
+					throw "AbilitiesService is not initialized";
 				}
 			});
 			if (!success) {
-				log("Error", `Failed to apply benefit: ${errorMsg}`);
+				log("Error", `Failed to apply benefit ${benefitFunctionName}: ${errorMsg}`);
 			}
 
 			if (!isInitialCheck) {
@@ -147,24 +195,54 @@ export class PurchaseProcessingService {
 		const benefitFunctionName = productBenefitMap.get(productId);
 
 		if (benefitFunctionName !== undefined) {
-			log("Info", `Applying benefit for product ${productId} to ${player.Name}`);
-			log("Debug", `Checking abilitiesService: ${this.abilitiesService}`);
-			log("Debug", `Checking if applyBenefitByName is available`);
+			log(
+				"Info",
+				`Attempting to apply benefit [${benefitFunctionName}] for product ${productId} to ${player.Name}`,
+			);
 			// Use pcall to safely call the method
+			let purchaseDecision: Enum.ProductPurchaseDecision = Enum.ProductPurchaseDecision.NotProcessedYet;
 			const [success, errorMsg] = pcall(() => {
 				if (this.abilitiesService) {
-					this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+					// Prefer using applyBenefitByName if it exists
+					if ("applyBenefitByName" in this.abilitiesService && this.abilitiesService.applyBenefitByName) {
+						log("Debug", `Using applyBenefitByName for ${benefitFunctionName}`);
+						this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+					} else {
+						// Fallback: Call the specific method directly
+						log("Debug", `Fallback: Directly calling ${benefitFunctionName} on AbilitiesService`);
+						if (
+							benefitFunctionName in this.abilitiesService &&
+							typeIs(this.abilitiesService[benefitFunctionName as keyof AbilitiesService], "function")
+						) {
+							// Try direct method call - in Luau this must compile to a colon call (obj:method)
+							// We can't do this with dynamic property access in TypeScript directly
+							// So we need to use applyBenefitByName which handles this for us
+							if (this.abilitiesService && this.abilitiesService.applyBenefitByName) {
+								this.abilitiesService.applyBenefitByName(benefitFunctionName, player);
+							}
+						} else {
+							log(
+								"Error",
+								`Fallback: Benefit function ${benefitFunctionName} not found or not callable on AbilitiesService`,
+							);
+						}
+					}
+					// If we reached here without error inside the pcall, grant the purchase
+					purchaseDecision = Enum.ProductPurchaseDecision.PurchaseGranted;
+					this.processedReceipts.add(receiptInfo.PurchaseId);
+					this.notifyPlayer(player, "Product", productId);
 				} else {
 					log("Error", "AbilitiesService is not initialized");
+					throw "AbilitiesService is not initialized";
 				}
 			});
+
 			if (!success) {
-				log("Error", `Failed to apply benefit: ${errorMsg}`);
+				log("Error", `Failed to apply benefit ${benefitFunctionName}: ${errorMsg}`);
+				// Keep purchaseDecision as NotProcessedYet if pcall failed
 			}
 
-			this.notifyPlayer(player, "Product", productId);
-			this.processedReceipts.add(receiptInfo.PurchaseId);
-			return Enum.ProductPurchaseDecision.PurchaseGranted;
+			return purchaseDecision;
 		} else {
 			log("Error", `Unknown product ID: ${productId}`);
 			return Enum.ProductPurchaseDecision.NotProcessedYet;

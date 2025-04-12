@@ -1,4 +1,5 @@
 /node_modules
-/out
+# # Output directory
+#/out
 /include
 *.tsbuildinfo

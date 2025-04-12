@@ -12,14 +12,26 @@ const log = (level: "Info" | "Warn" | "Error" | "Debug", message: string) => {
 export class AbilitiesService {
 	constructor() {
 		log("Info", "AbilitiesService constructor called");
+		print("[DEBUG-ABILITIES] AbilitiesService constructor executed");
 	}
 
 	onInit(): void {
 		log("Info", "AbilitiesService initializing...");
+		print("[DEBUG-ABILITIES] AbilitiesService.onInit() called");
+		
 		// Any initialization logic can go here
+		print("[DEBUG-ABILITIES] Setting up PlayerAdded event in AbilitiesService");
 		Players.PlayerAdded.Connect((player) => {
 			log("Info", `Player ${player.Name} added, ready to apply benefits`);
+			print(`[DEBUG-ABILITIES] Player ${player.Name} added event fired in AbilitiesService`);
 		});
+		
+		// Check existing players
+		const existingPlayers = Players.GetPlayers();
+		print(`[DEBUG-ABILITIES] Found ${existingPlayers.size()} existing players on init`);
+		for (let i = 0; i < existingPlayers.size(); i++) {
+			print(`[DEBUG-ABILITIES] Existing player: ${existingPlayers[i].Name}`);
+		}
 	}
 
 	// --- Benefit Implementation Functions ---
@@ -73,18 +85,48 @@ export class AbilitiesService {
 
 	// Wrapper method to call benefit functions by name, ensuring correct 'this' context
 	public applyBenefitByName(benefitName: string, player: Player): void {
-		log("Info", `Applying benefit ${benefitName} to ${player.Name}`);
-		if (benefitName in this) {
-			log("Debug", `Found method ${benefitName}, calling it for ${player.Name}`);
-			const method = this[benefitName as keyof this];
-			const [success, errorMsg] = pcall(() => {
-				(method as (player: Player) => void)(player);
-			});
-			if (!success) {
-				log("Error", `Error applying benefit ${benefitName}: ${errorMsg}`);
+		print(`[DEBUG-ABILITIES] applyBenefitByName called with benefit: ${benefitName}, player: ${player.Name}`);
+		log("Info", `Applying benefit ${benefitName} to ${player.Name} via applyBenefitByName`);
+
+		const [success, errorMsg] = pcall(() => {
+			switch (benefitName) {
+				case "applyRegenerationBenefit":
+					this.applyRegenerationBenefit(player);
+					break;
+				case "apply2xHealthBenefit":
+					this.apply2xHealthBenefit(player);
+					break;
+				case "applySprintBenefit":
+					this.applySprintBenefit(player);
+					break;
+				case "apply2xSpeedBenefit":
+					this.apply2xSpeedBenefit(player);
+					break;
+				case "applyExtraLivesBenefit":
+					this.applyExtraLivesBenefit(player);
+					break;
+				case "applyReviveBenefit":
+					this.applyReviveBenefit(player);
+					break;
+				case "applyTeamReviveBenefit":
+					this.applyTeamReviveBenefit(player);
+					break;
+				// Add cases for developer product benefits if they are distinct methods
+				// case "applyTemporarySpeedBoost": this.applyTemporarySpeedBoost(player); break;
+				// case "applyTemporaryRegeneration": this.applyTemporaryRegeneration(player); break;
+				// case "applyTemporaryShield": this.applyTemporaryShield(player); break;
+				default:
+					log(
+						"Error",
+						`Benefit method ${benefitName} not found or handled in AbilitiesService.applyBenefitByName`,
+					);
+					return; // Exit the pcall function body
 			}
-		} else {
-			log("Error", `Benefit method ${benefitName} not found in AbilitiesService`);
+			log("Debug", `Successfully called ${benefitName} for ${player.Name} via applyBenefitByName`);
+		});
+
+		if (!success) {
+			log("Error", `Error applying benefit ${benefitName} via applyBenefitByName: ${errorMsg}`);
 		}
 	}
 
