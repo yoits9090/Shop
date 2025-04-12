@@ -1,5 +1,6 @@
 import { Service } from "@flamework/core";
 import { Players } from "@rbxts/services";
+import { getRemotes } from "../shared/GameRemotes.shared";
 
 // Use a more descriptive logger
 const log = (level: "Info" | "Warn" | "Error" | "Debug", message: string) => {
@@ -15,52 +16,213 @@ export class AbilitiesService {
 		print("[DEBUG-ABILITIES] AbilitiesService constructor executed");
 	}
 
+	// Properties for regeneration and other ability states
+	private regenLoopRunning = false;
+
 	onInit(): void {
 		log("Info", "AbilitiesService initializing...");
 		print("[DEBUG-ABILITIES] AbilitiesService.onInit() called");
-		
-		// Any initialization logic can go here
+
+		// Set up player added event for tracking and benefits
 		print("[DEBUG-ABILITIES] Setting up PlayerAdded event in AbilitiesService");
 		Players.PlayerAdded.Connect((player) => {
 			log("Info", `Player ${player.Name} added, ready to apply benefits`);
 			print(`[DEBUG-ABILITIES] Player ${player.Name} added event fired in AbilitiesService`);
+
+			// Set up character added event to re-apply benefits
+			player.CharacterAdded.Connect((character) => {
+				this.applyCharacterBenefits(player);
+			});
 		});
-		
-		// Check existing players
+
+		// Check existing players and apply benefits if needed
 		const existingPlayers = Players.GetPlayers();
 		print(`[DEBUG-ABILITIES] Found ${existingPlayers.size()} existing players on init`);
 		for (let i = 0; i < existingPlayers.size(); i++) {
-			print(`[DEBUG-ABILITIES] Existing player: ${existingPlayers[i].Name}`);
+			const player = existingPlayers[i];
+			print(`[DEBUG-ABILITIES] Existing player: ${player.Name}`);
+
+			// Set up character added event
+			player.CharacterAdded.Connect((character) => {
+				this.applyCharacterBenefits(player);
+			});
+
+			// Apply to current character if exists
+			if (player.Character) {
+				this.applyCharacterBenefits(player);
+			}
 		}
 	}
 
 	// --- Benefit Implementation Functions ---
 	// NOTE: Implement the actual game logic for each benefit.
 
+	// Start regeneration loop for all players with regeneration
+	private startRegenerationLoop(): void {
+		if (this.regenLoopRunning) return;
+
+		this.regenLoopRunning = true;
+		log("Info", "Starting regeneration loop for all eligible players");
+
+		// Create a loop to handle regeneration for all players
+		task.spawn(() => {
+			// Use regular while loop with task.wait rather than an infinite loop
+			while (this.regenLoopRunning) {
+				task.wait(1); // Regenerate every second
+
+				// Process all players
+				const players = Players.GetPlayers();
+				for (const player of players) {
+					if (player.GetAttribute("HasRegeneration")) {
+						if (player.Character) {
+							this.applyRegenToCharacter(player, player.Character);
+						}
+					}
+				}
+			}
+		});
+	}
+
+	// Apply regeneration to a specific character
+	private applyRegenToCharacter(player: Player, character: Model): void {
+		const humanoid = character.FindFirstChildOfClass("Humanoid") as Humanoid;
+		if (!humanoid) return;
+
+		// Only regenerate if not at full health
+		if (humanoid.Health < humanoid.MaxHealth) {
+			// Regenerate 1 health per second
+			humanoid.Health = math.min(humanoid.Health + 1, humanoid.MaxHealth);
+
+			// Add visual effect for regeneration (optional)
+			this.createRegenerationEffect(character);
+		}
+	}
+
+	// Create a visual effect for regeneration (particles, etc.)
+	private createRegenerationEffect(character: Model): void {
+		// You could create particles or other visual effects here
+		// This is just a placeholder implementation
+		const humanoidRootPart = character.FindFirstChild("HumanoidRootPart") as BasePart;
+		if (!humanoidRootPart) return;
+
+		// Check if effect already exists to avoid duplication
+		if (humanoidRootPart.FindFirstChild("RegenEffect")) return;
+
+		// Create a small visual indicator for debugging
+		const effect = new Instance("Part") as Part;
+		effect.Name = "RegenEffect";
+		effect.Size = new Vector3(0.2, 0.2, 0.2);
+		effect.Shape = Enum.PartType.Ball;
+		effect.Material = Enum.Material.Neon;
+		effect.BrickColor = new BrickColor("Lime green");
+		effect.CanCollide = false;
+		effect.Anchored = false;
+
+		// Weld to character
+		const weld = new Instance("WeldConstraint") as WeldConstraint;
+		weld.Part0 = humanoidRootPart;
+		weld.Part1 = effect;
+		weld.Parent = effect;
+
+		effect.Parent = humanoidRootPart;
+
+		// Remove after a short time
+		task.delay(0.5, () => {
+			effect.Destroy();
+		});
+	}
+
 	public applyRegenerationBenefit(player: Player): void {
 		log("Info", `Applying regeneration benefit to ${player.Name}`);
-		// TODO: Implement game logic for regeneration (e.g., start a health regeneration loop)
-		// Example: player.SetAttribute("HasRegen", true);
+		// Set player attribute for regeneration
+		player.SetAttribute("HasRegeneration", true);
+
+		// Begin regeneration loop if not already running
+		if (!this.regenLoopRunning) {
+			this.startRegenerationLoop();
+		}
+
+		// Apply to current character if exists
+		if (player.Character) {
+			this.applyRegenToCharacter(player, player.Character);
+		}
 	}
 
 	public apply2xHealthBenefit(player: Player): void {
 		log("Info", `Applying 2x health benefit to ${player.Name}`);
-		// TODO: Implement game logic for 2x health (e.g., increase MaxHealth and Health)
-		// Example: const humanoid = player.Character?.FindFirstChildOfClass("Humanoid");
-		//          if (humanoid) { humanoid.MaxHealth *= 2; humanoid.Health = humanoid.MaxHealth; }
+		// Set player attribute
+		player.SetAttribute("Has2xHealth", true);
+
+		// Apply to current character if exists
+		if (player.Character) {
+			const humanoid = player.Character.FindFirstChildOfClass("Humanoid") as Humanoid;
+			if (humanoid) {
+				// To avoid multiplying repeatedly, check if already applied
+				if (!player.GetAttribute("Health2xApplied")) {
+					log("Info", `Setting 2x health for ${player.Name}'s character`);
+					player.SetAttribute("Health2xApplied", true);
+					humanoid.MaxHealth *= 2;
+					humanoid.Health = humanoid.MaxHealth;
+				}
+			}
+		}
+
+		// Setup character added listener for future spawns
+		if (!player.GetAttribute("Health2xListenerSetup")) {
+			player.SetAttribute("Health2xListenerSetup", true);
+			player.CharacterAdded.Connect((character) => {
+				if (player.GetAttribute("Has2xHealth")) {
+					const humanoid = character.WaitForChild("Humanoid") as Humanoid;
+					log("Info", `Setting 2x health for ${player.Name}'s new character`);
+					humanoid.MaxHealth *= 2;
+					humanoid.Health = humanoid.MaxHealth;
+				}
+			});
+		}
 	}
 
 	public applySprintBenefit(player: Player): void {
 		log("Info", `Applying sprint benefit to ${player.Name}`);
-		// TODO: Implement game logic for sprint (e.g., enable a faster walk speed ability)
-		// Example: player.SetAttribute("CanSprint", true);
+		// Set player attribute for sprint capability
+		player.SetAttribute("CanSprint", true);
+
+		// Use the GameRemotes system to access the sprint remote event
+		const remotes = getRemotes();
+
+		// Fire the remote to let client know sprint is enabled
+		remotes.sprintEnabled.FireClient(player, true);
+		log("Info", `Sprint capability enabled for ${player.Name} via GameRemotes`);
 	}
 
 	public apply2xSpeedBenefit(player: Player): void {
 		log("Info", `Applying 2x speed benefit to ${player.Name}`);
-		// TODO: Implement game logic for 2x speed (e.g., increase WalkSpeed)
-		// Example: const humanoid = player.Character?.FindFirstChildOfClass("Humanoid");
-		//          if (humanoid) { humanoid.WalkSpeed *= 2; }
+		// Set player attribute
+		player.SetAttribute("Has2xSpeed", true);
+
+		// Apply to current character if exists
+		if (player.Character) {
+			const humanoid = player.Character.FindFirstChildOfClass("Humanoid") as Humanoid;
+			if (humanoid) {
+				// Avoid applying multiple times
+				if (!player.GetAttribute("Speed2xApplied")) {
+					log("Info", `Setting 2x speed for ${player.Name}'s character`);
+					player.SetAttribute("Speed2xApplied", true);
+					humanoid.WalkSpeed *= 2;
+				}
+			}
+		}
+
+		// Setup character added listener for future spawns
+		if (!player.GetAttribute("Speed2xListenerSetup")) {
+			player.SetAttribute("Speed2xListenerSetup", true);
+			player.CharacterAdded.Connect((character) => {
+				if (player.GetAttribute("Has2xSpeed")) {
+					const humanoid = character.WaitForChild("Humanoid") as Humanoid;
+					log("Info", `Setting 2x speed for ${player.Name}'s new character`);
+					humanoid.WalkSpeed *= 2;
+				}
+			});
+		}
 	}
 
 	public applyExtraLivesBenefit(player: Player): void {
@@ -75,6 +237,88 @@ export class AbilitiesService {
 		// TODO: Implement game logic for revive (e.g., respawn the player immediately if dead)
 		// Example: const humanoid = player.Character?.FindFirstChildOfClass("Humanoid");
 		//          if (humanoid && humanoid.Health <= 0) { player.LoadCharacter(); }
+	}
+
+	public applyTemporaryShield(player: Player, duration: number = 30): void {
+		log("Info", `Applying temporary shield to ${player.Name} for ${duration} seconds`);
+		player.SetAttribute("HasShield", true);
+
+		// Get the remotes system
+		const remotes = getRemotes();
+
+		// Notify client to show shield effect
+		remotes.applyEffect.FireClient(player, "Shield", duration);
+
+		// Apply shield mechanics to character if it exists
+		if (player.Character) {
+			this.applyShieldToCharacter(player.Character);
+		}
+
+		// Setup listener for character respawns during shield duration
+		const shieldConnection = player.CharacterAdded.Connect((character) => {
+			if (player.GetAttribute("HasShield")) {
+				this.applyShieldToCharacter(character);
+			}
+		});
+
+		// Remove the shield after duration expires
+		task.delay(duration, () => {
+			player.SetAttribute("HasShield", false);
+			shieldConnection.Disconnect(); // Clean up the connection
+			log("Info", `Shield expired for ${player.Name}`);
+
+			// Notify client that shield has expired
+			remotes.applyEffect.FireClient(player, "ShieldExpired", 0);
+
+			// Remove shield effect from current character if it exists
+			if (player.Character) {
+				this.removeShieldFromCharacter(player.Character);
+			}
+		});
+	}
+
+	private applyShieldToCharacter(character: Model): void {
+		// Implementation would depend on game mechanics
+		// For example, this could make the character temporarily invulnerable
+		// or create a shield mesh around the character
+
+		const humanoid = character.FindFirstChildOfClass("Humanoid") as Humanoid;
+		if (!humanoid) return;
+
+		// Apply shield effect - in this example we'll just create a visual indicator
+		const humanoidRootPart = character.FindFirstChild("HumanoidRootPart") as BasePart;
+		if (!humanoidRootPart) return;
+
+		// Check if shield already exists to avoid duplication
+		if (humanoidRootPart.FindFirstChild("ShieldEffect")) return;
+
+		// Create a shield visual effect
+		const shieldEffect = new Instance("Part") as Part;
+		shieldEffect.Name = "ShieldEffect";
+		shieldEffect.Shape = Enum.PartType.Ball;
+		shieldEffect.Size = new Vector3(8, 8, 8);
+		shieldEffect.Transparency = 0.7;
+		shieldEffect.CanCollide = false;
+		shieldEffect.Material = Enum.Material.ForceField;
+		shieldEffect.BrickColor = new BrickColor("Cyan");
+
+		// Weld to character
+		const weld = new Instance("WeldConstraint") as WeldConstraint;
+		weld.Part0 = humanoidRootPart;
+		weld.Part1 = shieldEffect;
+		weld.Parent = shieldEffect;
+
+		shieldEffect.Parent = humanoidRootPart;
+	}
+
+	private removeShieldFromCharacter(character: Model): void {
+		const humanoidRootPart = character.FindFirstChild("HumanoidRootPart") as BasePart;
+		if (!humanoidRootPart) return;
+
+		const shieldEffect = humanoidRootPart.FindFirstChild("ShieldEffect");
+		if (shieldEffect) {
+			shieldEffect.Destroy();
+		}
 	}
 
 	public applyTeamReviveBenefit(player: Player): void {
@@ -135,22 +379,19 @@ export class AbilitiesService {
 	public applyCharacterBenefits(player: Player): void {
 		log("Info", `Applying character-specific benefits for ${player.Name}`);
 
-		// Example: Re-apply 2x speed if the player owns the gamepass
-		// We need MarketplaceService here if we check ownership within this service
-		// Alternatively, the calling service (like PurchaseService or a PlayerJoin service)
-		// could perform the check and then call the specific ability function.
+		// Re-apply 2x health if player has it
+		if (player.GetAttribute("Has2xHealth")) {
+			this.apply2xHealthBenefit(player);
+		}
 
-		// const MarketplaceService = game.GetService("MarketplaceService");
-		// const speedPassId = 1149964231;
-		// pcall(() => {
-		// 	const ownsPass = MarketplaceService.UserOwnsGamePassAsync(player.UserId, speedPassId);
-		// 	if (ownsPass) {
-		// 		const humanoid = character.FindFirstChildOfClass("Humanoid");
-		// 		if (humanoid) {
-		// 			log("Info", `Applying 2x speed to ${player.Name}'s character (on spawn)`);
-		// 			humanoid.WalkSpeed *= 2; // Be careful with repeated multiplication!
-		// 		}
-		// 	}
-		// });
+		// Re-apply 2x speed if player has it
+		if (player.GetAttribute("Has2xSpeed")) {
+			this.apply2xSpeedBenefit(player);
+		}
+
+		// Re-apply sprint ability if player has it
+		if (player.GetAttribute("CanSprint")) {
+			this.applySprintBenefit(player);
+		}
 	}
 }

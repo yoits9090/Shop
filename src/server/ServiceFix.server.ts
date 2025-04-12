@@ -1,51 +1,63 @@
-// ServiceFix.server.ts
-// This script runs at runtime to patch the Flamework services after they're loaded
+// ServiceFix.server.ts - Direct sprint enabler for gamepass owners
+import { Players, MarketplaceService } from "@rbxts/services";
+import { getRemotes } from "../shared/GameRemotes.shared";
 
-import { Service } from "@flamework/core";
-import { Players } from "@rbxts/services";
+// Get the remotes system
+const remotes = getRemotes();
 
-const log = (level: "Info" | "Warn" | "Error" | "Debug", message: string) => {
-	print(`[ServiceFixer][${level}] ${message}`);
-};
+// This script runs on the server and enables sprint only for players with the sprint gamepass
+print("[SprintFix] Starting sprint fix script");
 
-@Service({})
-class ServiceFixerService {
-	constructor() {
-		log("Info", "ServiceFixerService constructor called");
-		print("[DEBUG-FIXER] ServiceFixerService constructor executed");
-	}
+// Sprint gamepass ID
+const SPRINT_GAMEPASS_ID = 1151894037;
 
-	onInit(): void {
-		log("Info", "ServiceFixerService initializing...");
-		print("[DEBUG-FIXER] ServiceFixerService.onInit() called");
-		
-		try {
-			// Since we need to make direct edits to the compiled code to fix the service decorator issues,
-			// the best approach is to copy the compiled files after build and manually edit them.
-			// This script is just a placeholder to ensure we have something loading in the service slot.
-			
-			// Fix the global service table to ensure it exists
-			const globalTable = _G as unknown as Record<string, unknown>;
-			
-			// Use proper type checking to avoid 'any' usage
-			if (!globalTable.FixedServices || typeIs(globalTable.FixedServices, "table") === false) {
-				globalTable.FixedServices = {} as unknown;
-			}
-			
-			print("[DEBUG-FIXER] Service fixer initialized");
-			
-			// Add a timer to check for existing players periodically
-			task.spawn(() => {
-				task.wait(2); // Give time for other services to initialize
-				print("[DEBUG-FIXER] Running player check");
-				const players = Players.GetPlayers();
-				print(`[DEBUG-FIXER] Found ${players.size()} existing players`);
-			});
-		} catch (err) {
-			print(`[DEBUG-FIXER] Error in service fixer: ${err}`);
-		}
+// Function to check if a player owns the sprint gamepass and enable it if they do
+function checkAndEnableSprint(player: Player): void {
+	// Use pcall to safely check ownership
+	const [success, ownsGamepass] = pcall(() => {
+		return MarketplaceService.UserOwnsGamePassAsync(player.UserId, SPRINT_GAMEPASS_ID);
+	});
+
+	if (success && ownsGamepass) {
+		// Set the attribute that the client checks for
+		player.SetAttribute("CanSprint", true);
+
+		// Tell the client that sprint is enabled
+		remotes.sprintEnabled.FireClient(player, true);
+		print(`[SprintFix] Enabled sprint for ${player.Name} (has gamepass)`);
+	} else {
+		// Make sure sprint is disabled for players without the gamepass
+		player.SetAttribute("CanSprint", false);
+		remotes.sprintEnabled.FireClient(player, false);
+		print(`[SprintFix] Sprint disabled for ${player.Name} (no gamepass)`);
 	}
 }
 
-// This export ensures the script is loaded
-export { ServiceFixerService };
+// Check and enable sprint for all existing players
+Players.GetPlayers().forEach(checkAndEnableSprint);
+
+// Check and enable sprint for any new players who join
+Players.PlayerAdded.Connect(checkAndEnableSprint);
+
+// Set up character respawn handling
+Players.PlayerAdded.Connect((player) => {
+	player.CharacterAdded.Connect(() => {
+		// Small delay to ensure client is ready
+		task.wait(0.5);
+		// Re-check gamepass ownership and re-enable sprint after respawn if they own it
+		const [success, ownsGamepass] = pcall(() => {
+			return MarketplaceService.UserOwnsGamePassAsync(player.UserId, SPRINT_GAMEPASS_ID);
+		});
+
+		if (success && ownsGamepass) {
+			// Re-enable sprint after respawn
+			remotes.sprintEnabled.FireClient(player, true);
+			print(`[SprintFix] Re-enabled sprint after respawn for ${player.Name} (has gamepass)`);
+		}
+	});
+});
+
+print("[SprintFix] Sprint fix initialized and running");
+
+// No need to export anything
+export {};

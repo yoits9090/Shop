@@ -1,0 +1,6 @@
+{
+  "extends": "./node_modules/@rbxts/eslint-config/index.json",
+  "rules": {
+    "roblox-ts/lua-truthiness": "off"
+  }
+}

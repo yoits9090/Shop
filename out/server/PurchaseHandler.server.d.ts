@@ -7,4 +7,7 @@ export declare class PurchaseProcessingService {
     private handleProductPurchase;
     private notifyPlayer;
     private processedReceipts;
+    private applyExtraLivesBenefit;
+    private applyReviveBenefit;
+    private applyTeamReviveBenefit;
 }

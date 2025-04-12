@@ -34,6 +34,21 @@ gamepassesFrame.Position = closePosition;
 gamepassesFrame.Visible = false;
 gamepassShop.Enabled = false;
 
+// Get access to the UI state manager
+const ReplicatedStorage = game.GetService("ReplicatedStorage");
+
+// Attempt to find or wait for the UIStateManager
+let stateManager: BindableFunction | undefined;
+
+// Function to get the state manager
+const getStateManager = (): BindableFunction | undefined => {
+	if (stateManager) return stateManager;
+	
+	// Try to find the manager
+	stateManager = ReplicatedStorage.FindFirstChild("UIStateManager") as BindableFunction;
+	return stateManager;
+};
+
 print("[OnBindable] Connected to bindableEvent.Event");
 bindableEvent.Event.Connect((isEntering?: boolean) => {
 	print("[OnBindable] BindableEvent fired with isEntering:", isEntering);
@@ -41,20 +56,50 @@ bindableEvent.Event.Connect((isEntering?: boolean) => {
 
 	if (shouldOpen) {
 		print("[OnBindable] Opening shop UI");
-		gamepassShop.Enabled = true;
-		gamepassesFrame.Visible = true;
-		const openTween = TweenService.Create(gamepassesFrame, openInfo, { Position: openPosition });
-		openTween.Play();
-		print("[OnBindable] Open tween played");
+		
+		// Attempt to set the UI state through the state manager
+		const manager = getStateManager();
+		if (manager) {
+			const result = manager.Invoke("set", "Shop");
+			print(`[OnBindable] Set UI state to Shop: ${result}`);
+			
+			// If state manager allowed the change, animate the frame
+			if (result) {
+				gamepassesFrame.Visible = true;
+				const openTween = TweenService.Create(gamepassesFrame, openInfo, { Position: openPosition });
+				openTween.Play();
+				print("[OnBindable] Open tween played");
+			}
+		} else {
+			// Fallback if state manager is not available
+			print("[OnBindable] UIStateManager not found, using direct control");
+			gamepassShop.Enabled = true;
+			gamepassesFrame.Visible = true;
+			const openTween = TweenService.Create(gamepassesFrame, openInfo, { Position: openPosition });
+			openTween.Play();
+			print("[OnBindable] Open tween played");
+		}
 	} else {
 		print("[OnBindable] Closing shop UI");
+		
+		// Animate the closing regardless of state manager
 		const closeTween = TweenService.Create(gamepassesFrame, closeInfo, { Position: closePosition });
 		closeTween.Play();
 		print("[OnBindable] Close tween played");
+		
 		closeTween.Completed.Connect(() => {
-			print("[OnBindable] Close tween completed, hiding GUI");
-			gamepassShop.Enabled = false;
-			gamepassesFrame.Visible = false;
+			print("[OnBindable] Close tween completed, hiding UI");
+			
+			// Set state to None through the manager
+			const manager = getStateManager();
+			if (manager) {
+				manager.Invoke("set", "None");
+				print("[OnBindable] Set UI state to None");
+			} else {
+				// Fallback if manager not available
+				gamepassShop.Enabled = false;
+				gamepassesFrame.Visible = false;
+			}
 		});
 	}
 });
