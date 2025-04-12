@@ -26,6 +26,10 @@ const closeInfo = new TweenInfo(0.5, Enum.EasingStyle.Quint, Enum.EasingDirectio
 const openPosition = new UDim2(0.5, 0, 0.5, 0);
 const closePosition = new UDim2(0.5, 0, 1.5, 0);
 
+// Set the anchor point to center the frame
+gamepassesFrame.AnchorPoint = new Vector2(0.5, 0.5);
+
+// Initial position and visibility
 gamepassesFrame.Position = closePosition;
 gamepassesFrame.Visible = false;
 gamepassShop.Enabled = false;
