@@ -1,35 +1,56 @@
 // On bindable event, fired by onfire.client.ts, will trigger two different tweens, Close, and Open
-const plr = game.GetService("Players").LocalPlayer;
-const playerGui = plr.WaitForChild("PlayerGui") as PlayerGui;
+const Players = game.GetService("Players");
+const TweenService = game.GetService("TweenService");
+
+const player = Players.LocalPlayer;
+print("[OnBindable] Client script running for player:", player.Name);
+
+const playerGui = player.WaitForChild("PlayerGui") as PlayerGui;
+print("[OnBindable] PlayerGui found");
+
 const gamepassShop = playerGui.WaitForChild("GamepassShop") as ScreenGui;
+print("[OnBindable] GamepassShop ScreenGui found");
+
 const gamepassesFrame = gamepassShop.WaitForChild("GamepassesFrame") as Frame;
-const tweenService = game.GetService("TweenService");
+print("[OnBindable] GamepassesFrame found");
 
-// Create bindable event
-const bindableEvent = new Instance("BindableEvent");
-bindableEvent.Name = "Tweenservice";
-bindableEvent.Parent = gamepassesFrame;
+// IMPORTANT: Check if the BindableEvent is being looked for in the right place
+// Note: In OnFire.client.ts you're using FindFirstChild on gamepassesFrame
+// But here you're using WaitForChild on gamepassShop
+const bindableEvent = gamepassShop.WaitForChild("Tweenservice") as BindableEvent;
+print("[OnBindable] Tweenservice BindableEvent found");
 
-// Define tween properties
 const openInfo = new TweenInfo(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out);
 const closeInfo = new TweenInfo(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In);
 
 const openPosition = new UDim2(0.5, 0, 0.5, 0);
 const closePosition = new UDim2(0.5, 0, 1.5, 0);
 
-// Set initial position to closed
 gamepassesFrame.Position = closePosition;
+gamepassesFrame.Visible = false;
+gamepassShop.Enabled = false;
 
-// Connect to the bindable event
-bindableEvent.Event.Connect(() => {
-	// Check if the frame is off-screen (closed)
-	if (gamepassesFrame.Position.Y.Scale > 1) {
-		// Open animation
-		const openTween = tweenService.Create(gamepassesFrame, openInfo, { Position: openPosition });
+print("[OnBindable] Connected to bindableEvent.Event");
+bindableEvent.Event.Connect((isEntering?: boolean) => {
+	print("[OnBindable] BindableEvent fired with isEntering:", isEntering);
+	const shouldOpen = isEntering === undefined || isEntering;
+
+	if (shouldOpen) {
+		print("[OnBindable] Opening shop UI");
+		gamepassShop.Enabled = true;
+		gamepassesFrame.Visible = true;
+		const openTween = TweenService.Create(gamepassesFrame, openInfo, { Position: openPosition });
 		openTween.Play();
+		print("[OnBindable] Open tween played");
 	} else {
-		// Close animation
-		const closeTween = tweenService.Create(gamepassesFrame, closeInfo, { Position: closePosition });
+		print("[OnBindable] Closing shop UI");
+		const closeTween = TweenService.Create(gamepassesFrame, closeInfo, { Position: closePosition });
 		closeTween.Play();
+		print("[OnBindable] Close tween played");
+		closeTween.Completed.Connect(() => {
+			print("[OnBindable] Close tween completed, hiding GUI");
+			gamepassShop.Enabled = false;
+			gamepassesFrame.Visible = false;
+		});
 	}
 });
