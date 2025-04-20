@@ -12,6 +12,10 @@ export class GameRemotes {
 	public readonly sprintEnabled: RemoteEvent;
 	public readonly applyEffect: RemoteEvent;
 	public readonly notifyPurchase: RemoteEvent;
+	public readonly noLivesRemaining: RemoteEvent;
+	public readonly preventRespawn: RemoteEvent;
+	public readonly respawnRequest: RemoteFunction;
+	public readonly shopOpen: RemoteEvent;
 
 	private constructor() {
 		// Check if remotes folder already exists
@@ -30,6 +34,10 @@ export class GameRemotes {
 		this.sprintEnabled = this.getOrCreateRemote("SprintEnabled");
 		this.applyEffect = this.getOrCreateRemote("ApplyEffect");
 		this.notifyPurchase = this.getOrCreateRemote("NotifyPurchase");
+		this.noLivesRemaining = this.getOrCreateRemote("NoLivesRemaining");
+		this.preventRespawn = this.getOrCreateRemote("PreventAutoRespawn");
+		this.respawnRequest = this.getOrCreateFunction("RespawnFunction");
+		this.shopOpen = this.getOrCreateRemote("ShopOpen");
 	}
 
 	/**
@@ -45,6 +53,21 @@ export class GameRemotes {
 		}
 
 		return remote;
+	}
+
+	/**
+	 * Get existing function or create a new one if it doesn't exist
+	 */
+	private getOrCreateFunction(name: string): RemoteFunction {
+		let fn = this._folder.FindFirstChild(name) as RemoteFunction;
+
+		if (!fn) {
+			fn = new Instance("RemoteFunction");
+			fn.Name = name;
+			fn.Parent = this._folder;
+		}
+
+		return fn;
 	}
 
 	/**

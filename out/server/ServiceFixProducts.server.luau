@@ -51,7 +51,7 @@ local processReceipt = function(receiptInfo)
 	local productId = receiptInfo.ProductId
 	local productName = "Unknown Product"
 	local success = false
-	if productId == 3261484089 then
+	if productId == 3264057522 then
 		-- Apply 3x extra lives benefit using the LivesManager system
 		log(`Applying 3x extra lives to {player.Name}`)
 		-- Use the AddExtraLives function if available
@@ -85,7 +85,7 @@ local processReceipt = function(receiptInfo)
 		end
 		productName = "3x Extra Lives"
 		success = true
-	elseif productId == 3261484228 then
+	elseif productId == 3264060360 then
 		-- Apply revive benefit using the LivesManager revive system
 		log(`Applying revive to {player.Name}`)
 		-- Add one life to the player
@@ -128,7 +128,7 @@ local processReceipt = function(receiptInfo)
 		end
 		productName = "Revive"
 		success = true
-	elseif productId == 3261490620 then
+	elseif productId == 3264059941 then
 		-- Apply team revive benefit
 		log(`Applying team revive benefit to {player.Name}`)
 		-- Get all players in the game

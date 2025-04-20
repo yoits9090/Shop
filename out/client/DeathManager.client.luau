@@ -4,6 +4,7 @@ local _services = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts
 local Players = _services.Players
 local MarketplaceService = _services.MarketplaceService
 local ReplicatedStorage = _services.ReplicatedStorage
+local TeleportService = _services.TeleportService
 -- Simple logger function
 local log = function(message)
 	print(`[DeathManager-Client] {message}`)
@@ -11,6 +12,8 @@ end
 log("Starting DeathManager client script")
 -- Product ID for revive
 local REVIVE_PRODUCT_ID = 3261484228
+-- Place ID for lobby teleport
+local LOBBY_PLACE_ID = 100501279549809
 -- Get local player
 local player = Players.LocalPlayer
 log(`Script running for player: {player.Name}`)
@@ -74,12 +77,12 @@ local createControlledDeathScreen = function()
 	-- Create revive button
 	local reviveBtn = Instance.new("TextButton")
 	reviveBtn.Name = "Revive"
-	reviveBtn.Text = "REVIVE"
-	reviveBtn.TextSize = 20
+	reviveBtn.Text = "REVIVE NOW (PURCHASE)"
+	reviveBtn.TextSize = 24
 	reviveBtn.TextColor3 = Color3.new(1, 1, 1)
 	reviveBtn.Size = UDim2.new(0.6, 0, 0.2, 0)
 	reviveBtn.Position = UDim2.new(0.2, 0, 0.6, 0)
-	reviveBtn.BackgroundColor3 = Color3.new(0.8, 0, 0)
+	reviveBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 	reviveBtn.BorderSizePixel = 0
 	reviveBtn.Parent = frame
 	-- Connect revive button to purchase product
@@ -87,9 +90,30 @@ local createControlledDeathScreen = function()
 		log("Revive button clicked")
 		MarketplaceService:PromptProductPurchase(player, REVIVE_PRODUCT_ID)
 	end)
+	-- Create return to lobby button
+	local returnBtn = Instance.new("TextButton")
+	returnBtn.Name = "Return"
+	returnBtn.Text = "GO BACK TO LOBBY"
+	returnBtn.TextSize = 20
+	returnBtn.TextColor3 = Color3.new(1, 1, 1)
+	returnBtn.Size = UDim2.new(0.6, 0, 0.2, 0)
+	returnBtn.Position = UDim2.new(0.2, 0, 0.8, 0)
+	returnBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+	returnBtn.BorderSizePixel = 0
+	returnBtn.Parent = frame
+	returnBtn.Activated:Connect(function()
+		TeleportService:Teleport(LOBBY_PLACE_ID, player)
+	end)
 	-- Parent to PlayerGui
 	ourControlledDeathScreen.Parent = playerGui
 	log("Created our controlled death screen")
+	-- Disable any other DeathScreen in PlayerGui
+	for _, child in playerGui:GetChildren() do
+		if child:IsA("ScreenGui") and child.Name == "DeathScreen" and child ~= ourControlledDeathScreen then
+			child.Enabled = false
+			child.Name = "OriginalDeathScreen_Disabled"
+		end
+	end
 	return ourControlledDeathScreen
 end
 -- Function to force death screen visibility based on player lives and character status

@@ -1,4 +1,4 @@
-import { Players, MarketplaceService } from "@rbxts/services";
+import { Players, MarketplaceService, Workspace } from "@rbxts/services";
 
 // Simple logger function
 const log = (message: string) => {
@@ -13,6 +13,15 @@ const PROXIMITY_PROMPT_RANGE = 8; // Studs
 
 // Map to track which players already have prompts
 const deadPlayerPrompts = new Map<Player, ProximityPrompt>();
+// Map to track cloned corpse models
+const deadPlayerCorpses = new Map<Player, Model>();
+// Ensure a folder for corpses exists
+let corpsesFolder = Workspace.FindFirstChild("Corpses") as Folder;
+if (!corpsesFolder) {
+    corpsesFolder = new Instance("Folder");
+    corpsesFolder.Name = "Corpses";
+    corpsesFolder.Parent = Workspace;
+}
 
 // Function to create revive prompt on a player's character
 const createRevivePrompt = (player: Player, character: Model) => {
@@ -59,64 +68,72 @@ const createRevivePrompt = (player: Player, character: Model) => {
 // Function to remove a player's revive prompt
 const removeRevivePrompt = (player: Player) => {
     const prompt = deadPlayerPrompts.get(player);
-    if (prompt && prompt.IsDescendantOf(game)) {
+    if (prompt && prompt.IsDescendantOf(Workspace)) {
         prompt.Destroy();
-        log(`Removed revive prompt for ${player.Name}`);
     }
     deadPlayerPrompts.delete(player);
+    // Clean up cloned corpse
+    const corpse = deadPlayerCorpses.get(player);
+    if (corpse && corpse.IsDescendantOf(Workspace)) {
+        corpse.Destroy();
+    }
+    deadPlayerCorpses.delete(player);
 };
 
 // Function to handle player death
 const onPlayerDied = (player: Player, character: Model) => {
+    // Ensure character still exists before cloning
+    if (!character.Parent) {
+        log(`onPlayerDied: character removed before processing for ${player.Name}, skipping`);
+        return;
+    }
+    // Prevent duplicate corpse
+    if (deadPlayerCorpses.has(player)) {
+        log(`onPlayerDied: corpse already exists for ${player.Name}, skipping duplicate`);
+        return;
+    }
     log(`Player ${player.Name} died`);
-    createRevivePrompt(player, character);
-    
-    // When character is removed, also remove the prompt
-    character.AncestryChanged.Connect((_, parent) => {
-        if (!parent) {
-            removeRevivePrompt(player);
-        }
+    // Attempt to clone the character safely
+    let corpse: Model | undefined;
+    const success = pcall(() => {
+        corpse = character.Clone() as Model;
     });
+    if (!success || !corpse) {
+        log(`onPlayerDied: failed to clone character for ${player.Name}`);
+        return;
+    }
+    corpse.Name = `Corpse_${player.UserId}`;
+    corpse.Parent = corpsesFolder;
+    deadPlayerCorpses.set(player, corpse);
+    // Create revive prompt on the cloned corpse
+    createRevivePrompt(player, corpse);
+
+    // NOTE: do not auto‑respawn here; prompt will handle revive
 };
 
-// Handle existing players
-Players.GetPlayers().forEach((player) => {
-    if (player.Character) {
-        // Get the humanoid to check if the player is already dead
-        const humanoid = player.Character.FindFirstChildOfClass("Humanoid") as Humanoid;
-        if (humanoid && humanoid.Health <= 0) {
-            onPlayerDied(player, player.Character);
+// Setup death listener for players
+const onPlayerAdded = (player: Player) => {
+    // Handle existing character
+    const currentCharacter = player.Character;
+    if (currentCharacter) {
+        const humanoid = currentCharacter.FindFirstChildOfClass("Humanoid") as Humanoid;
+        if (humanoid) {
+            humanoid.Died.Connect(() => {
+                onPlayerDied(player, currentCharacter);
+            });
         }
-        
-        // Connect to death event
-        humanoid.Died.Connect(() => {
-            onPlayerDied(player, player.Character!);
-        });
     }
-
-    // Listen for new characters (respawns)
+    // Listen for future character spawns
     player.CharacterAdded.Connect((character) => {
-        // Remove any existing prompts when player respawns
-        removeRevivePrompt(player);
-        
-        // Connect to the new character's humanoid died event
         const humanoid = character.WaitForChild("Humanoid") as Humanoid;
         humanoid.Died.Connect(() => {
             onPlayerDied(player, character);
         });
     });
-});
-
-// Handle new players
-Players.PlayerAdded.Connect((player) => {
-    player.CharacterAdded.Connect((character) => {
-        // Connect to humanoid died event
-        const humanoid = character.WaitForChild("Humanoid") as Humanoid;
-        humanoid.Died.Connect(() => {
-            onPlayerDied(player, character);
-        });
-    });
-});
+};
+// Attach to current and future players
+Players.PlayerAdded.Connect(onPlayerAdded);
+Players.GetPlayers().forEach(onPlayerAdded);
 
 // Handle players leaving
 Players.PlayerRemoving.Connect((player) => {

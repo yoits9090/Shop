@@ -1,4 +1,4 @@
-import { Players, MarketplaceService, ReplicatedStorage } from "@rbxts/services";
+import { Players, MarketplaceService, ReplicatedStorage, TeleportService } from "@rbxts/services";
 
 // Simple logger function
 const log = (message: string) => {
@@ -9,6 +9,8 @@ log("Starting DeathManager client script");
 
 // Product ID for revive
 const REVIVE_PRODUCT_ID = 3261484228;
+// Place ID for lobby teleport
+const LOBBY_PLACE_ID = 100501279549809;
 
 // Get local player
 const player = Players.LocalPlayer;
@@ -84,25 +86,46 @@ const createControlledDeathScreen = () => {
     // Create revive button
     const reviveBtn = new Instance("TextButton");
     reviveBtn.Name = "Revive";
-    reviveBtn.Text = "REVIVE";
-    reviveBtn.TextSize = 20;
+    reviveBtn.Text = "REVIVE NOW (PURCHASE)";
+    reviveBtn.TextSize = 24;
     reviveBtn.TextColor3 = new Color3(1, 1, 1);
     reviveBtn.Size = new UDim2(0.6, 0, 0.2, 0);
     reviveBtn.Position = new UDim2(0.2, 0, 0.6, 0);
-    reviveBtn.BackgroundColor3 = new Color3(0.8, 0, 0);
+    reviveBtn.BackgroundColor3 = new Color3(0.8, 0.2, 0.2);
     reviveBtn.BorderSizePixel = 0;
     reviveBtn.Parent = frame;
-    
     // Connect revive button to purchase product
     reviveBtn.Activated.Connect(() => {
         log("Revive button clicked");
         MarketplaceService.PromptProductPurchase(player, REVIVE_PRODUCT_ID);
     });
     
+    // Create return to lobby button
+    const returnBtn = new Instance("TextButton");
+    returnBtn.Name = "Return";
+    returnBtn.Text = "GO BACK TO LOBBY";
+    returnBtn.TextSize = 20;
+    returnBtn.TextColor3 = new Color3(1, 1, 1);
+    returnBtn.Size = new UDim2(0.6, 0, 0.2, 0);
+    returnBtn.Position = new UDim2(0.2, 0, 0.8, 0);
+    returnBtn.BackgroundColor3 = new Color3(0.8, 0.2, 0.2);
+    returnBtn.BorderSizePixel = 0;
+    returnBtn.Parent = frame;
+    returnBtn.Activated.Connect(() => {
+        TeleportService.Teleport(LOBBY_PLACE_ID, player);
+    });
+    
     // Parent to PlayerGui
     ourControlledDeathScreen.Parent = playerGui;
     log("Created our controlled death screen");
-    
+
+    // Disable any other DeathScreen in PlayerGui
+    for (const child of playerGui.GetChildren()) {
+        if (child.IsA("ScreenGui") && child.Name === "DeathScreen" && child !== ourControlledDeathScreen) {
+            child.Enabled = false;
+            child.Name = "OriginalDeathScreen_Disabled";
+        }
+    }
     return ourControlledDeathScreen;
 };
 
@@ -605,4 +628,3 @@ player.AttributeChanged.Connect((attributeName) => {
 });
 
 log("Death manager client script initialized");
-

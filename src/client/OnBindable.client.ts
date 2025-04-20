@@ -14,6 +14,21 @@ print("[OnBindable] GamepassShop ScreenGui found");
 const gamepassesFrame = gamepassShop.WaitForChild("GamepassesFrame") as Frame;
 print("[OnBindable] GamepassesFrame found");
 
+// Close button handler
+const closeButton = gamepassShop.WaitForChild("Close") as TextButton;
+if (closeButton) {
+    closeButton.Activated.Connect(() => {
+        print("[OnBindable] Close button clicked");
+        const closeTween = TweenService.Create(gamepassesFrame, closeInfo, { Position: closePosition });
+        closeTween.Play();
+        closeTween.Completed.Connect(() => {
+            gamepassShop.Enabled = false;
+            gamepassesFrame.Visible = false;
+            print("[OnBindable] Closed via close button");
+        });
+    });
+}
+
 // IMPORTANT: Check if the BindableEvent is being looked for in the right place
 // Note: In OnFire.client.ts you're using FindFirstChild on gamepassesFrame
 // But here you're using WaitForChild on gamepassShop

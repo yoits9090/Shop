@@ -33,6 +33,10 @@ do
 		self.sprintEnabled = self:getOrCreateRemote("SprintEnabled")
 		self.applyEffect = self:getOrCreateRemote("ApplyEffect")
 		self.notifyPurchase = self:getOrCreateRemote("NotifyPurchase")
+		self.noLivesRemaining = self:getOrCreateRemote("NoLivesRemaining")
+		self.preventRespawn = self:getOrCreateRemote("PreventAutoRespawn")
+		self.respawnRequest = self:getOrCreateFunction("RespawnFunction")
+		self.shopOpen = self:getOrCreateRemote("ShopOpen")
 	end
 	function GameRemotes:getOrCreateRemote(name)
 		local remote = self._folder:FindFirstChild(name)
@@ -42,6 +46,15 @@ do
 			remote.Parent = self._folder
 		end
 		return remote
+	end
+	function GameRemotes:getOrCreateFunction(name)
+		local fn = self._folder:FindFirstChild(name)
+		if not fn then
+			fn = Instance.new("RemoteFunction")
+			fn.Name = name
+			fn.Parent = self._folder
+		end
+		return fn
 	end
 	function GameRemotes:getInstance()
 		if not GameRemotes._instance then

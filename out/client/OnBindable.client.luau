@@ -10,15 +10,32 @@ local gamepassShop = playerGui:WaitForChild("GamepassShop")
 print("[OnBindable] GamepassShop ScreenGui found")
 local gamepassesFrame = gamepassShop:WaitForChild("GamepassesFrame")
 print("[OnBindable] GamepassesFrame found")
+-- Close button handler
+local closeButton = gamepassShop:WaitForChild("Close")
+local closeInfo, closePosition
+if closeButton then
+	closeButton.Activated:Connect(function()
+		print("[OnBindable] Close button clicked")
+		local closeTween = TweenService:Create(gamepassesFrame, closeInfo, {
+			Position = closePosition,
+		})
+		closeTween:Play()
+		closeTween.Completed:Connect(function()
+			gamepassShop.Enabled = false
+			gamepassesFrame.Visible = false
+			print("[OnBindable] Closed via close button")
+		end)
+	end)
+end
 -- IMPORTANT: Check if the BindableEvent is being looked for in the right place
 -- Note: In OnFire.client.ts you're using FindFirstChild on gamepassesFrame
 -- But here you're using WaitForChild on gamepassShop
 local bindableEvent = gamepassShop:WaitForChild("Tweenservice")
 print("[OnBindable] Tweenservice BindableEvent found")
 local openInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local closeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+closeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 local openPosition = UDim2.new(0.5, 0, 0.5, 0)
-local closePosition = UDim2.new(0.5, 0, 1.5, 0)
+closePosition = UDim2.new(0.5, 0, 1.5, 0)
 -- Set the anchor point to center the frame
 gamepassesFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 -- Initial position and visibility

@@ -7,13 +7,49 @@ local Workspace = game:GetService("Workspace")
 -- const shopRemote = new Instance("RemoteEvent");
 -- shopRemote.Name = "ShopDetected";
 -- shopRemote.Parent = ReplicatedStorage;
---finding remote event
-local shopRemote = ReplicatedStorage:FindFirstChild("ShopOpen")
--- Get the shop detection part directly from Workspace
-local shopDetectPart = Workspace:FindFirstChild("ShopDetect")
-print("ShopDetect part found:", shopDetectPart ~= nil)
+-- Get or wait for the ShopOpen RemoteEvent in GameRemotes folder
+local remotesFolder = ReplicatedStorage:WaitForChild("GameRemotes")
+local shopRemote = remotesFolder:WaitForChild("ShopOpen")
+-- Locate ShopDetect part with debug
+print("[OnTouch] Locating ShopDetect part...")
+local shopModel = Workspace:FindFirstChild("workshop") or Workspace:FindFirstChild("Workshop")
+if shopModel then
+	print("[OnTouch] Found workshop model at:", shopModel:GetFullName())
+else
+	print("[OnTouch] Workshop model not found, skipping direct child lookup")
+end
+local _result = shopModel
+if _result ~= nil then
+	_result = _result:FindFirstChild("ShopDetect")
+end
+local shopDetectPart = _result
+if shopDetectPart then
+	print("[OnTouch] Found ShopDetect child of workshop at:", shopDetectPart:GetFullName())
+else
+	print("[OnTouch] ShopDetect not found under workshop, searching all descendants...")
+	local _exp = Workspace:GetDescendants()
+	-- ▼ ReadonlyArray.find ▼
+	local _callback = function(d)
+		return d.Name == "ShopDetect" and d:IsA("BasePart")
+	end
+	local _result_1
+	for _i, _v in _exp do
+		if _callback(_v, _i - 1, _exp) == true then
+			_result_1 = _v
+			break
+		end
+	end
+	-- ▲ ReadonlyArray.find ▲
+	local fallbackPart = _result_1
+	if fallbackPart then
+		shopDetectPart = fallbackPart
+		print("[OnTouch] Fallback found ShopDetect at:", shopDetectPart:GetFullName())
+	else
+		warn("[OnTouch] ShopDetect part not found in Workspace")
+	end
+end
 -- Check if RemoteEvent exists
-print("ShopOpen RemoteEvent found:", shopRemote ~= nil)
+print("ShopOpen RemoteEvent loaded:", shopRemote.Name)
 -- Simple cooldown flag
 local canFire = true
 local COOLDOWN_TIME = 0.5
